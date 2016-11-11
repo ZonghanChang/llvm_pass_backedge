@@ -1,5 +1,7 @@
 #include "llvm/Pass.h"
 #include "llvm/IR/Function.h"
+#include "llvm/ADT/DepthFirstIterator.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
@@ -17,7 +19,6 @@ namespace backedge {
 		
 		virtual bool runOnFunction(Function &F);
 		
-		//virtual void getAnalysisUsage(AnalysisUsage &Info) const;
 	};
 
 
@@ -25,23 +26,39 @@ namespace backedge {
 		errs() << "FUNCTION ";
 		errs().write_escaped(F.getName()) << "\n";
 
-		for(Function::arg_iterator arg = F.arg_begin(), argEnd = F.arg_end(); arg != argEnd; ++arg) {
-			errs() << arg->getName() <<"\n";
-			errs() << arg->getType()->getTypeID() <<"\n";
-		}
+
 		// map variable map a basic block to its dominator set
 		std::map<BasicBlock*, std::set<BasicBlock*>*> map;
 
-		// initialize all sets
+		// Mark reachable blocks.
+		SmallPtrSet<BasicBlock*, 8> visitedBlocks;
+  		for (df_ext_iterator<Function*, SmallPtrSet<BasicBlock*, 8>> currBB = df_ext_begin(&F, visitedBlocks), 
+			endBlock = df_ext_end(&F, visitedBlocks); 
+			currBB != endBlock; 
+			currBB++) {			
+		}
+
+		// set dominator set of all unreachable basic blocks to be itself
+		std::set<BasicBlock*> unreachableBB;
+		for (Function::iterator currBB = F.begin(); currBB != F.end(); currBB++) {
+			if (visitedBlocks.count(currBB) == 0) {
+				unreachableBB.insert(currBB);
+			}
+		}
+
+		// initialize dominator sets
 		for (Function::iterator blk = F.begin(), blkEnd = F.end(); blk != blkEnd; ++blk) {
 			if(blk == F.begin()) {
-				//errs() << blk->getName() << " haha1-> " << "\n";
+				std::set<BasicBlock*> *set = new std::set<BasicBlock*>();
+				set->insert(blk);
+				map[blk] = set;
+			}
+			else if(unreachableBB.find(blk) != unreachableBB.end()) {
 				std::set<BasicBlock*> *set = new std::set<BasicBlock*>();
 				set->insert(blk);
 				map[blk] = set;
 			}
 			else {
-				//errs() << blk->getName() << " haha2-> " << "\n";
 				std::set<BasicBlock*> *set = new std::set<BasicBlock*>();
 				for (Function::iterator eachBlk = F.begin(); eachBlk != blkEnd; ++eachBlk) {
 					set->insert(eachBlk);
@@ -50,39 +67,17 @@ namespace backedge {
 			}
 		}
 
-		// for (Function::iterator blk = F.begin(), blkEnd = F.end(); blk != blkEnd; ++blk) {
-		// 	  	std::set<BasicBlock*> *succSet = map[blk];
-		// 	  	for(std::set<BasicBlock *>::iterator bbitem = succSet->begin(); bbitem != succSet->end(); bbitem++) {
-		// 	  		errs() << blk->getName() << " -> " << (*bbitem)->getName() << "\n";
-		// 	  	}
-			
-		// }
-
-		//print
-		// int t = 0;
-		// for (Function::iterator blk = F.begin(), blkEnd = F.end(); blk != blkEnd; ++blk) {
-		// 	t++;
-		// 	const TerminatorInst *TInst = blk->getTerminator();
-		// 	for (unsigned I = 0, NSucc = TInst->getNumSuccessors(); I < NSucc; ++I) {
-		// 	  	BasicBlock *succ = TInst->getSuccessor(I);
-		// 	  	std::set<BasicBlock*> *succSet = map[succ];
-		// 	  	for(std::set<BasicBlock *>::iterator bbitem = succSet->begin(); bbitem != succSet->end(); bbitem++) {
-		// 	  		errs() << blk->getName() << " -> " << t << (*bbitem)->getName() << "\n";
-		// 	  	}
-		// 	}
-		// }
-
-		// algorithm
+		// compute dominator set
 		bool changed = true;
+		std::set<BasicBlock*> *reachableBB = new std::set<BasicBlock*>();
+		reachableBB->insert(&F.getEntryBlock());
 		while(changed) {
 			changed = false;
 			for (Function::iterator blk = F.begin(), blkEnd = F.end(); blk != blkEnd; ++blk) {
 				const TerminatorInst *TInst = blk->getTerminator();
 				for (unsigned I = 0, NSucc = TInst->getNumSuccessors(); I < NSucc; ++I) {
 				  	BasicBlock *succ = TInst->getSuccessor(I);
-
-					//errs() << blk->getName() << " -> " << succ->getName() << "\n";
-
+				  	reachableBB->insert(succ);
 				  	std::set<BasicBlock*> *succSet = map[succ];
 				  	std::set<BasicBlock*> *currset = map[blk];
 				  	std::set<BasicBlock*> *del = new std::set<BasicBlock*>();
@@ -103,7 +98,7 @@ namespace backedge {
 		}
 
 
-		// 再次遍历blk, 检查每个blk的succ是否在这个blk的set里，在的话就是back edge
+		// detect and print back edge
 		for (Function::iterator blk = F.begin(), blkEnd = F.end(); blk != blkEnd; ++blk) {
 			const TerminatorInst *TInst = blk->getTerminator();
 			for (unsigned I = 0, NSucc = TInst->getNumSuccessors(); I < NSucc; ++I) {
@@ -114,7 +109,8 @@ namespace backedge {
 			  	}
 			}
 		}
-		//Function does not modify anything
+		errs() << "\n";
+		
 		return false;
 	}
 	

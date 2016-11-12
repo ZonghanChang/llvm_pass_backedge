@@ -1,7 +1,7 @@
 # Makefile for tests; generates unoptimized .ll IR for all tests
 
 # Test files
-FILES = test1.bc test2.bc test3.bc test4.bc test5.bc test6.bc
+FILES = test1.bc test2.bc test3.bc test4.bc
 
 ##
 LLVM_ROOT = ../../Debug+Asserts

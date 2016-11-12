@@ -48,12 +48,7 @@ namespace backedge {
 
 		// initialize dominator sets
 		for (Function::iterator blk = F.begin(), blkEnd = F.end(); blk != blkEnd; ++blk) {
-			if(blk == F.begin()) {
-				std::set<BasicBlock*> *set = new std::set<BasicBlock*>();
-				set->insert(blk);
-				map[blk] = set;
-			}
-			else if(unreachableBB.find(blk) != unreachableBB.end()) {
+			if(blk == F.begin() || unreachableBB.find(blk) != unreachableBB.end()) {
 				std::set<BasicBlock*> *set = new std::set<BasicBlock*>();
 				set->insert(blk);
 				map[blk] = set;
